@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebDesk - Remote Desktop Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: #ff4757;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        nav a:hover {
+            color: #ff4757;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .connection-container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .panel {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff5f56;
+        }
+
+        .status-indicator.connected {
+            background: #27c93f;
+        }
+
+        .screen-container {
+            background: #000;
+            border-radius: 10px;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #333;
+            margin-bottom: 1.5rem;
+        }
+
+        .screen-header {
+            background: #222;
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .screen-title {
+            font-size: 0.9rem;
+        }
+
+        .screen-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .control-btn {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .close { background: #ff5f56; }
+        .minimize { background: #ffbd2e; }
+        .maximize { background: #27c93f; }
+
+        .screen-content {
+            height: calc(100% - 35px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: #111;
+        }
+
+        .remote-screen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .remote-cursor {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            border: 2px solid #333;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        }
+
+        .remote-cursor.active {
+            display: block;
+        }
+
+        .desktop-icon {
+            width: 60px;
+            height: 60px;
+            margin: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .desktop-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .desktop-icon img {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 5px;
+        }
+
+        .desktop-icon span {
+            font-size: 0.8rem;
+            text-align: center;
+            color: #fff;
+        }
+
+        .connection-info {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            opacity: 0.7;
+        }
+
+        .btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            background: #ff3742;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+
+        .control-title {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 0.5rem;
+        }
+
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .control-btn-small {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 0.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .control-btn-small:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .message-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .message {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .terminal {
+            background: #111;
+            border-radius: 5px;
+            padding: 1rem;
+            font-family: monospace;
+            height: 150px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .terminal-line {
+            margin-bottom: 5px;
+        }
+
+        .terminal-prompt {
+            color: #27c93f;
+        }
+
+        .terminal-command {
+            color: #fff;
+        }
+
+        .terminal-output {
+            color: #ccc;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .connection-setup {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .connection-id {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .id-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 0.5rem 0;
+        }
+
+        .input-group {
+            display: flex;
+            margin: 1rem 0;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px 0 0 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .input-group button {
+            border-radius: 0 5px 5px 0;
+        }
+
+        @media (max-width: 768px) {
+            .connection-container {
+                flex-direction: column;
+            }
+            
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🖥️</div>
+            <div>WebDesk</div>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="#">Home</a></li>
+                <li><a href="#">Features</a></li>
+                <li><a href="#">Download</a></li>
+                <li><a href="#">Support</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="connection-setup">
+            <h1>WebDesk Remote Desktop</h1>
+            <p>Connect to another computer or share your screen for remote control</p>
+            
+            <div class="connection-id">
+                <div>Your Connection ID:</div>
+                <div class="id-display" id="connectionId">WD-784-516-293</div>
+                <button class="btn" id="copyIdBtn">Copy ID</button>
+            </div>
+            
+            <div class="input-group">
+                <input type="text" id="remoteId" placeholder="Enter remote connection ID">
+                <button class="btn" id="connectBtn">Connect</button>
+            </div>
+        </div>
+
+        <div class="connection-container">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Remote Desktop</div>
+                    <div class="status">
+                        <div class="status-indicator" id="remoteStatus"></div>
+                        <span id="remoteStatusText">Disconnected</span>
+                    </div>
+                </div>
+                
+                <div class="screen-container">
+                    <div class="screen-header">
+                        <div class="screen-title">Remote Desktop - demo@webdesk</div>
+                        <div class="screen-controls">
+                            <div class="control-btn close"></div>
+                            <div class="control-btn minimize"></div>
+                            <div class="control-btn maximize"></div>
+                        </div>
+                    </div>
+                    <div class="screen-content">
+                        <div class="remote-screen" id="remoteScreen">
+                            <div class="remote-cursor" id="remoteCursor"></div>
+                            <div class="desktop-icon">
+                                <img src="https://picsum.photos/seed/folder/48/48.jpg" alt="Folder">
+                                <span>Documents</span>
+                            </div>
+                            <div class="desktop-icon">
+                                <img src="https://picsum.photos/seed/browser/48/48.jpg" alt="Browser">
+                                <span>Browser</span>
+                            </div>
+                            <div class="desktop-icon">
+                                <img src="https://picsum.photos/seed/settings/48/48.jpg" alt="Settings">
+                                <span>Settings</span>
+                            </div>
+                            <div class="desktop-icon">
+                                <img src="https://picsum.photos/seed/trash/48/48.jpg" alt="Trash">
+                                <span>Trash</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="connection-info">
+                    <div class="info-row">
+                        <span class="info-label">Remote ID:</span>
+                        <span id="remoteIdDisplay">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Connection Time:</span>
+                        <span id="connectionTime">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Latency:</span>
+                        <span id="latency">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Bandwidth:</span>
+                        <span id="bandwidth">-</span>
+                    </div>
+                </div>
+                
+                <div class="control-panel">
+                    <div class="control-group">
+                        <div class="control-title">Remote Control</div>
+                        <div class="control-buttons">
+                            <button class="control-btn-small" id="ctrlBtn">Ctrl</button>
+                            <button class="control-btn-small" id="altBtn">Alt</button>
+                            <button class="control-btn-small" id="shiftBtn">Shift</button>
+                            <button class="control-btn-small" id="winBtn">Win</button>
+                            <button class="control-btn-small" id="escBtn">Esc</button>
+                            <button class="control-btn-small" id="tabBtn">Tab</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-title">Session Actions</div>
+                        <div class="control-buttons">
+                            <button class="control-btn-small" id="fileTransferBtn">File Transfer</button>
+                            <button class="control-btn-small" id="chatBtn">Chat</button>
+                            <button class="control-btn-small" id="recordBtn">Record</button>
+                            <button class="control-btn-small" id="rebootBtn">Reboot</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-title">Display Settings</div>
+                        <div class="control-buttons">
+                            <button class="control-btn-small" id="qualityBtn">Quality</button>
+                            <button class="control-btn-small" id="scaleBtn">Scale</button>
+                            <button class="control-btn-small" id="viewOnlyBtn">View Only</button>
+                            <button class="control-btn-small" id="multiMonBtn">Multi-Mon</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-title">System</div>
+                        <div class="control-buttons">
+                            <button class="control-btn-small" id="taskManagerBtn">Task Manager</button>
+                            <button class="control-btn-small" id="cmdBtn">Command</button>
+                            <button class="control-btn-small" id="lockBtn">Lock</button>
+                            <button class="control-btn-small" id="disconnectBtn">Disconnect</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Terminal</div>
+                    <div class="status">
+                        <div class="status-indicator connected" id="terminalStatus"></div>
+                        <span>Active</span>
+                    </div>
+                </div>
+                
+                <div class="terminal" id="terminal">
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">user@remote:~$</span>
+                        <span class="terminal-command">Welcome to WebDesk Remote Terminal</span>
+                    </div>
+                    <div class="terminal-line">
+                        <span class="terminal-prompt">user@remote:~$</span>
+                        <span class="terminal-output">Connected to remote system</span>
+                    </div>
+                </div>
+                
+                <div class="input-group" style="margin-top: 1rem;">
+                    <input type="text" id="terminalInput" placeholder="Enter command...">
+                    <button class="btn" id="executeBtn">Execute</button>
+                </div>
+                
+                <div class="connection-info" style="margin-top: 1.5rem;">
+                    <div class="info-row">
+                        <span class="info-label">Remote System:</span>
+                        <span>Linux 5.15.0-52-generic</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">User:</span>
+                        <span>remote-user</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Working Dir:</span>
+                        <span>/home/remote-user</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="message-container" id="messageContainer"></div>
+
+    <script>
+        // DOM elements
+        const connectionId = document.getElementById('connectionId');
+        const copyIdBtn = document.getElementById('copyIdBtn');
+        const remoteId = document.getElementById('remoteId');
+        const connectBtn = document.getElementById('connectBtn');
+        const remoteStatus = document.getElementById('remoteStatus');
+        const remoteStatusText = document.getElementById('remoteStatusText');
+        const remoteScreen = document.getElementById('remoteScreen');
+        const remoteCursor = document.getElementById('remoteCursor');
+        const remoteIdDisplay = document.getElementById('remoteIdDisplay');
+        const connectionTime = document.getElementById('connectionTime');
+        const latency = document.getElementById('latency');
+        const bandwidth = document.getElementById('bandwidth');
+        const terminal = document.getElementById('terminal');
+        const terminalInput = document.getElementById('terminalInput');
+        const executeBtn = document.getElementById('executeBtn');
+        const messageContainer = document.getElementById('messageContainer');
+        
+        // Control buttons
+        const ctrlBtn = document.getElementById('ctrlBtn');
+        const altBtn = document.getElementById('altBtn');
+        const shiftBtn = document.getElementById('shiftBtn');
+        const winBtn = document.getElementById('winBtn');
+        const escBtn = document.getElementById('escBtn');
+        const tabBtn = document.getElementById('tabBtn');
+        const fileTransferBtn = document.getElementById('fileTransferBtn');
+        const chatBtn = document.getElementById('chatBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const rebootBtn = document.getElementById('rebootBtn');
+        const qualityBtn = document.getElementById('qualityBtn');
+        const scaleBtn = document.getElementById('scaleBtn');
+        const viewOnlyBtn = document.getElementById('viewOnlyBtn');
+        const multiMonBtn = document.getElementById('multiMonBtn');
+        const taskManagerBtn = document.getElementById('taskManagerBtn');
+        const cmdBtn = document.getElementById('cmdBtn');
+        const lockBtn = document.getElementById('lockBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        
+        // Connection state
+        let isConnected = false;
+        let connectionStartTime = null;
+        
+        // Generate random connection ID
+        function generateConnectionId() {
+            const chars = '0123456789';
+            let result = 'WD-';
+            for (let i = 0; i < 9; i++) {
+                if (i === 3 || i === 6) result += '-';
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+        
+        // Initialize connection ID
+        connectionId.textContent = generateConnectionId();
+        
+        // Copy connection ID
+        copyIdBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(connectionId.textContent)
+                .then(() => {
+                    showMessage('Connection ID copied to clipboard');
+                })
+                .catch(err => {
+                    showMessage('Failed to copy ID: ' + err);
+                });
+        });
+        
+        // Connect to remote
+        connectBtn.addEventListener('click', () => {
+            const id = remoteId.value.trim();
+            if (id) {
+                connectToRemote(id);
+            } else {
+                showMessage('Please enter a valid connection ID');
+            }
+        });
+        
+        // Simulate connection to remote
+        function connectToRemote(id) {
+            // In a real application, this would establish a WebRTC connection
+            showMessage(`Connecting to ${id}...`);
+            
+            // Simulate connection delay
+            setTimeout(() => {
+                isConnected = true;
+                connectionStartTime = new Date();
+                remoteStatus.classList.add('connected');
+                remoteStatusText.textContent = 'Connected';
+                remoteIdDisplay.textContent = id;
+                updateConnectionInfo();
+                remoteCursor.classList.add('active');
+                
+                showMessage(`Successfully connected to ${id}`);
+                
+                // Start updating latency and bandwidth
+                setInterval(updateConnectionInfo, 3000);
+            }, 2000);
+        }
+        
+        // Update connection information
+        function updateConnectionInfo() {
+            if (!isConnected) return;
+            
+            // Update connection time
+            if (connectionStartTime) {
+                const now = new Date();
+                const diff = Math.floor((now - connectionStartTime) / 1000);
+                const minutes = Math.floor(diff / 60);
+                const seconds = diff % 60;
+                connectionTime.textContent = `${minutes}m ${seconds}s`;
+            }
+            
+            // Simulate latency
+            const latencyValue = Math.floor(Math.random() * 20) + 5;
+            latency.textContent = `${latencyValue}ms`;
+            
+            // Simulate bandwidth
+            const bandwidthValue = (Math.random() * 2 + 0.5).toFixed(1);
+            bandwidth.textContent = `${bandwidthValue} Mbps`;
+        }
+        
+        // Remote screen interaction
+        remoteScreen.addEventListener('mousemove', (e) => {
+            if (!isConnected) return;
+            
+            const rect = remoteScreen.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            remoteCursor.style.left = `${x}px`;
+            remoteCursor.style.top = `${y}px`;
+            
+            // In a real application, this would send mouse coordinates to the remote
+        });
+        
+        remoteScreen.addEventListener('click', (e) => {
+            if (!isConnected) return;
+            
+            // Visual feedback
+            remoteCursor.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            setTimeout(() => {
+                remoteCursor.style.transform = 'translate(-50%, -50%) scale(1)';
+            }, 200);
+            
+            // In a real application, this would send a click event to the remote
+        });
+        
+        // Terminal functionality
+        executeBtn.addEventListener('click', executeCommand);
+        terminalInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                executeCommand();
+            }
+        });
+        
+        function executeCommand() {
+            const command = terminalInput.value.trim();
+            if (!command) return;
+            
+            // Add command to terminal
+            const commandLine = document.createElement('div');
+            commandLine.className = 'terminal-line';
+            commandLine.innerHTML = `<span class="terminal-prompt">user@remote:~$</span> <span class="terminal-command">${command}</span>`;
+            terminal.appendChild(commandLine);
+            
+            // Simulate command execution
+            setTimeout(() => {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'terminal-line';
+                
+                // Generate output based on command
+                let output = '';
+                if (command === 'help') {
+                    output = 'Available commands: help, ls, pwd, whoami, date, clear';
+                } else if (command === 'ls') {
+                    output = 'Documents  Downloads  Music  Pictures  Videos';
+                } else if (command === 'pwd') {
+                    output = '/home/remote-user';
+                } else if (command === 'whoami') {
+                    output = 'remote-user';
+                } else if (command === 'date') {
+                    output = new Date().toString();
+                } else if (command === 'clear') {
+                    terminal.innerHTML = '';
+                    terminalInput.value = '';
+                    return;
+                } else {
+                    output = `Command not found: ${command}`;
+                }
+                
+                outputLine.innerHTML = `<span class="terminal-output">${output}</span>`;
+                terminal.appendChild(outputLine);
+                
+                // Scroll to bottom
+                terminal.scrollTop = terminal.scrollHeight;
+            }, 500);
+            
+            terminalInput.value = '';
+        }
+        
+        // Control button actions
+        function handleControlButton(buttonName) {
+            if (!isConnected) {
+                showMessage('Not connected to a remote system');
+                return;
+            }
+            
+            // Visual feedback
+            event.target.style.background = 'rgba(255, 71, 87, 0.5)';
+            setTimeout(() => {
+                event.target.style.background = 'rgba(255, 255, 255, 0.1)';
+            }, 300);
+            
+            // In a real application, this would send the command to the remote system
+            showMessage(`Sending command: ${buttonName}`);
+            
+            // Add to terminal
+            const commandLine = document.createElement('div');
+            commandLine.className = 'terminal-line';
+            commandLine.innerHTML = `<span class="terminal-prompt">user@remote:~$</span> <span class="terminal-command">remote-control ${buttonName}</span>`;
+            terminal.appendChild(commandLine);
+            
+            // Simulate response
+            setTimeout(() => {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'terminal-line';
+                outputLine.innerHTML = `<span class="terminal-output">Command executed: ${buttonName}</span>`;
+                terminal.appendChild(outputLine);
+                terminal.scrollTop = terminal.scrollHeight;
+            }, 500);
+        }
+        
+        // Add event listeners to control buttons
+        ctrlBtn.addEventListener('click', () => handleControlButton('ctrl'));
+        altBtn.addEventListener('click', () => handleControlButton('alt'));
+        shiftBtn.addEventListener('click', () => handleControlButton('shift'));
+        winBtn.addEventListener('click', () => handleControlButton('win'));
+        escBtn.addEventListener('click', () => handleControlButton('esc'));
+        tabBtn.addEventListener('click', () => handleControlButton('tab'));
+        fileTransferBtn.addEventListener('click', () => handleControlButton('file-transfer'));
+        chatBtn.addEventListener('click', () => handleControlButton('chat'));
+        recordBtn.addEventListener('click', () => handleControlButton('record'));
+        rebootBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to reboot the remote system?')) {
+                handleControlButton('reboot');
+            }
+        });
+        qualityBtn.addEventListener('click', () => handleControlButton('quality'));
+        scaleBtn.addEventListener('click', () => handleControlButton('scale'));
+        viewOnlyBtn.addEventListener('click', () => handleControlButton('view-only'));
+        multiMonBtn.addEventListener('click', () => handleControlButton('multi-mon'));
+        taskManagerBtn.addEventListener('click', () => handleControlButton('task-manager'));
+        cmdBtn.addEventListener('click', () => handleControlButton('cmd'));
+        lockBtn.addEventListener('click', () => handleControlButton('lock'));
+        disconnectBtn.addEventListener('click', () => {
+            if (isConnected && confirm('Are you sure you want to disconnect?')) {
+                isConnected = false;
+                remoteStatus.classList.remove('connected');
+                remoteStatusText.textContent = 'Disconnected';
+                remoteCursor.classList.remove('active');
+                showMessage('Disconnected from remote system');
+            }
+        });
+        
+        // Show message notification
+        function showMessage(text) {
+            const message = document.createElement('div');
+            message.className = 'message';
+            message.textContent = text;
+            messageContainer.appendChild(message);
+            
+            // Remove message after 3 seconds
+            setTimeout(() => {
+                message.style.opacity = '0';
+                setTimeout(() => {
+                    messageContainer.removeChild(message);
+                }, 300);
+            }, 3000);
+        }
+        
+        // Initialize
+        showMessage('Welcome to WebDesk Remote Desktop');
+    </script>
+</body>
+</html>
