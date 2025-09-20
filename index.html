@@ -285,6 +285,28 @@
             margin-bottom: 5px;
             color: #856404;
         }
+
+        .server-options {
+            background: #e8f4fd;
+            border: 1px solid #b8daff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .server-options h4 {
+            color: #004085;
+            margin-bottom: 10px;
+        }
+
+        .server-options select {
+            width: 100%;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #b8daff;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -299,6 +321,15 @@
 
         <!-- Initial Screen -->
         <div id="initialScreen">
+            <div class="server-options">
+                <h4>Signaling Server:</h4>
+                <select id="serverSelect" onchange="changeServer()">
+                    <option value="wss://webrtc-signaling.glitch.me">Server 1 (Glitch)</option>
+                    <option value="wss://webrtc-signaling-server.glitch.me">Server 2 (Glitch)</option>
+                    <option value="wss://simple-webrtc-signaling.herokuapp.com">Server 3 (Heroku)</option>
+                </select>
+            </div>
+            
             <button class="button button-primary" onclick="generateSession()">
                 Generate Session Code
             </button>
@@ -356,6 +387,7 @@
                     <li>Check that the host granted screen sharing permissions</li>
                     <li>Try refreshing both pages and reconnecting</li>
                     <li>Ensure both users have stable internet connections</li>
+                    <li>Try selecting a different signaling server above</li>
                 </ul>
             </div>
             
@@ -382,9 +414,10 @@
         let isHost = false;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
+        let reconnectTimeout = null;
 
-        // Using alternative public signaling server
-        const WS_SERVER = 'wss://webrtc-signaling-server.glitch.me';
+        // Default signaling server
+        let WS_SERVER = 'wss://webrtc-signaling.glitch.me';
 
         // WebRTC configuration
         const rtcConfiguration = {
@@ -398,6 +431,13 @@
         // Generate a random 6-digit session code
         function generateSessionCode() {
             return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // Change signaling server
+        function changeServer() {
+            const select = document.getElementById('serverSelect');
+            WS_SERVER = select.value;
+            console.log('Changed signaling server to:', WS_SERVER);
         }
 
         // Update connection status indicator
@@ -460,8 +500,21 @@
 
         // Connect to WebSocket server for signaling
         function connectWebSocket() {
+            // Clear any existing reconnect timeout
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            
             try {
                 showStatus('Connecting to signaling server...', 'info');
+                console.log('Connecting to WebSocket server:', WS_SERVER);
+                
+                // Close existing socket if any
+                if (socket) {
+                    socket.close();
+                }
+                
                 socket = new WebSocket(WS_SERVER);
                 
                 socket.onopen = () => {
@@ -478,9 +531,13 @@
                 };
                 
                 socket.onmessage = async (event) => {
-                    const message = JSON.parse(event.data);
-                    console.log('Received message:', message);
-                    await handleSignalingMessage(message);
+                    try {
+                        const message = JSON.parse(event.data);
+                        console.log('Received message:', message);
+                        await handleSignalingMessage(message);
+                    } catch (e) {
+                        console.error('Error parsing WebSocket message:', e);
+                    }
                 };
                 
                 socket.onclose = (event) => {
@@ -490,19 +547,26 @@
                     if (reconnectAttempts < maxReconnectAttempts) {
                         reconnectAttempts++;
                         showStatus(`Connection lost. Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`, 'info');
-                        setTimeout(connectWebSocket, 2000 * reconnectAttempts);
+                        
+                        // Exponential backoff for reconnection
+                        const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        console.log(`Reconnecting in ${timeout}ms...`);
+                        
+                        reconnectTimeout = setTimeout(() => {
+                            connectWebSocket();
+                        }, timeout);
                     } else {
-                        showStatus('Connection lost. Please try again.', 'error');
+                        showStatus('Connection lost. Please try a different server or check your connection.', 'error');
                     }
                 };
                 
                 socket.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    showStatus('Failed to connect to server. Please check your connection.', 'error');
+                    showStatus('Failed to connect to server. Please try a different server.', 'error');
                 };
             } catch (error) {
                 console.error('Failed to connect to WebSocket:', error);
-                showStatus('Failed to establish connection. Please try again.', 'error');
+                showStatus('Failed to establish connection. Please try a different server.', 'error');
             }
         }
 
@@ -720,6 +784,12 @@
 
         // Reset the application
         function resetApp() {
+            // Clear any reconnect timeout
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+            
             // Clean up connections
             cleanupConnection();
             
