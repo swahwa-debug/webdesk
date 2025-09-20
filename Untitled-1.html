@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Screen Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+            text-align: left;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button {
+            width: 100%;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
+        }
+
+        .button-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .button-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .button-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .button-secondary:hover {
+            background: #e8e8e8;
+        }
+
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .code-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px dashed #ddd;
+        }
+
+        .code {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 4px;
+            margin: 10px 0;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .video-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .divider {
+            margin: 20px 0;
+            text-align: center;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e0e0e0;
+        }
+
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            position: relative;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Screen Share</h1>
+        <p class="subtitle">Share your screen with anyone, anywhere</p>
+
+        <!-- Initial Screen -->
+        <div id="initialScreen">
+            <button class="button button-primary" onclick="generateSession()">
+                Generate Session Code
+            </button>
+            
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <div class="form-group">
+                <label for="sessionCode">Enter Session Code</label>
+                <input type="text" id="sessionCode" placeholder="Enter 6-digit code" maxlength="6">
+            </div>
+            
+            <button class="button button-secondary" onclick="joinSession()">
+                Join Session
+            </button>
+        </div>
+
+        <!-- Host Screen -->
+        <div id="hostScreen" class="hidden">
+            <div class="code-display">
+                <p>Your session code is:</p>
+                <div class="code" id="displayCode"></div>
+                <p style="color: #666; font-size: 0.9rem;">Share this code with the person you want to connect with</p>
+            </div>
+            
+            <button class="button button-primary" id="shareScreenBtn" onclick="startScreenShare()">
+                Share Screen
+            </button>
+            
+            <button class="button button-secondary" onclick="resetApp()">
+                New Session
+            </button>
+        </div>
+
+        <!-- Client Screen -->
+        <div id="clientScreen" class="hidden">
+            <p style="margin-bottom: 20px;">Connected to session: <strong id="connectedCode"></strong></p>
+            <p style="color: #666; margin-bottom: 20px;">Waiting for host to share screen...</p>
+            
+            <button class="button button-secondary" onclick="resetApp()">
+                Leave Session
+            </button>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusMessage" class="status"></div>
+
+        <!-- Video Container -->
+        <div id="videoContainer" class="video-container">
+            <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for WebRTC and WebSocket
+        let peerConnection = null;
+        let localStream = null;
+        let socket = null;
+        let sessionId = null;
+        let isHost = false;
+
+        // WebSocket server configuration - UPDATE THIS with your server address
+        const WS_SERVER = 'ws://localhost:8080'; // Change this to your WebSocket server
+
+        // WebRTC configuration
+        const rtcConfiguration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // Generate a random 6-digit session code
+        function generateSessionCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        // Generate a new session
+        function generateSession() {
+            sessionId = generateSessionCode();
+            isHost = true;
+            
+            // Show host screen
+            document.getElementById('initialScreen').classList.add('hidden');
+            document.getElementById('hostScreen').classList.remove('hidden');
+            document.getElementById('displayCode').textContent = sessionId;
+            
+            // Connect to WebSocket server
+            connectWebSocket();
+            
+            showStatus('Session created. Waiting for connection...', 'info');
+        }
+
+        // Join an existing session
+        function joinSession() {
+            const code = document.getElementById('sessionCode').value.trim();
+            
+            if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+                showStatus('Please enter a valid 6-digit code', 'error');
+                return;
+            }
+            
+            sessionId = code;
+            isHost = false;
+            
+            // Show client screen
+            document.getElementById('initialScreen').classList.add('hidden');
+            document.getElementById('clientScreen').classList.remove('hidden');
+            document.getElementById('connectedCode').textContent = sessionId;
+            
+            // Connect to WebSocket server
+            connectWebSocket();
+            
+            showStatus('Connecting to session...', 'info');
+        }
+
+        // Connect to WebSocket server for signaling
+        function connectWebSocket() {
+            try {
+                socket = new WebSocket(WS_SERVER);
+                
+                socket.onopen = () => {
+                    console.log('Connected to WebSocket server');
+                    
+                    // Register session with server
+                    socket.send(JSON.stringify({
+                        type: 'register',
+                        sessionId: sessionId,
+                        isHost: isHost
+                    }));
+                };
+                
+                socket.onmessage = async (event) => {
+                    const message = JSON.parse(event.data);
+                    await handleSignalingMessage(message);
+                };
+                
+                socket.onclose = () => {
+                    console.log('Disconnected from WebSocket server');
+                    showStatus('Connection lost. Please try again.', 'error');
+                };
+                
+                socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    showStatus('Failed to connect to server. Please check your connection.', 'error');
+                };
+            } catch (error) {
+                console.error('Failed to connect to WebSocket:', error);
+                showStatus('Failed to establish connection. Please try again.', 'error');
+            }
+        }
+
+        // Handle signaling messages from WebSocket
+        async function handleSignalingMessage(message) {
+            console.log('Received signaling message:', message);
+            
+            switch (message.type) {
+                case 'offer':
+                    if (!isHost) {
+                        await handleOffer(message.offer);
+                    }
+                    break;
+                    
+                case 'answer':
+                    if (isHost) {
+                        await handleAnswer(message.answer);
+                    }
+                    break;
+                    
+                case 'ice-candidate':
+                    await handleIceCandidate(message.candidate);
+                    break;
+                    
+                case 'peer-connected':
+                    showStatus('Peer connected successfully!', 'success');
+                    if (isHost) {
+                        document.getElementById('shareScreenBtn').disabled = false;
+                    }
+                    break;
+                    
+                case 'peer-disconnected':
+                    showStatus('Peer disconnected', 'info');
+                    cleanupConnection();
+                    break;
+            }
+        }
+
+        // Create and configure peer connection
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(rtcConfiguration);
+            
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        sessionId: sessionId,
+                        candidate: event.candidate
+                    }));
+                }
+            };
+            
+            // Handle connection state changes
+            peerConnection.onconnectionstatechange = () => {
+                console.log('Connection state:', peerConnection.connectionState);
+                
+                if (peerConnection.connectionState === 'failed') {
+                    showStatus('Connection failed. Please try again.', 'error');
+                    cleanupConnection();
+                }
+            };
+            
+            // Handle remote stream
+            peerConnection.ontrack = (event) => {
+                console.log('Received remote track');
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = event.streams[0];
+                document.getElementById('videoContainer').style.display = 'block';
+                showStatus('Screen sharing started!', 'success');
+            };
+        }
+
+        // Start screen sharing (host only)
+        async function startScreenShare() {
+            if (!isHost) return;
+            
+            try {
+                // Get screen stream
+                localStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: false
+                });
+                
+                // Create peer connection if not exists
+                if (!peerConnection) {
+                    createPeerConnection();
+                }
+                
+                // Add tracks to peer connection
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+                
+                // Handle stream end
+                localStream.getVideoTracks()[0].onended = () => {
+                    stopScreenShare();
+                };
+                
+                // Create and send offer
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                socket.send(JSON.stringify({
+                    type: 'offer',
+                    sessionId: sessionId,
+                    offer: offer
+                }));
+                
+                document.getElementById('shareScreenBtn').textContent = 'Stop Sharing';
+                document.getElementById('shareScreenBtn').onclick = stopScreenShare;
+                
+                showStatus('Screen sharing started!', 'success');
+                
+            } catch (error) {
+                console.error('Error starting screen share:', error);
+                showStatus('Failed to start screen sharing. Please try again.', 'error');
+            }
+        }
+
+        // Stop screen sharing
+        function stopScreenShare() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            if (peerConnection) {
+                peerConnection.getSenders().forEach(sender => {
+                    if (sender.track) {
+                        sender.track.stop();
+                    }
+                });
+            }
+            
+            document.getElementById('shareScreenBtn').textContent = 'Share Screen';
+            document.getElementById('shareScreenBtn').onclick = startScreenShare;
+            
+            showStatus('Screen sharing stopped', 'info');
+        }
+
+        // Handle incoming offer (client)
+        async function handleOffer(offer) {
+            if (!peerConnection) {
+                createPeerConnection();
+            }
+            
+            try {
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.send(JSON.stringify({
+                    type: 'answer',
+                    sessionId: sessionId,
+                    answer: answer
+                }));
+                
+            } catch (error) {
+                console.error('Error handling offer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle incoming answer (host)
+        async function handleAnswer(answer) {
+            try {
+                await peerConnection.setRemoteDescription(answer);
+            } catch (error) {
+                console.error('Error handling answer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle ICE candidate
+        async function handleIceCandidate(candidate) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(candidate);
+                }
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+
+        // Clean up connection
+        function cleanupConnection() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            const remoteVideo = document.getElementById('remoteVideo');
+            remoteVideo.srcObject = null;
+            document.getElementById('videoContainer').style.display = 'none';
+        }
+
+        // Reset the application
+        function resetApp() {
+            // Clean up connections
+            cleanupConnection();
+            
+            // Close WebSocket
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+            
+            // Reset variables
+            sessionId = null;
+            isHost = false;
+            
+            // Reset UI
+            document.getElementById('initialScreen').classList.remove('hidden');
+            document.getElementById('hostScreen').classList.add('hidden');
+            document.getElementById('clientScreen').classList.add('hidden');
+            document.getElementById('sessionCode').value = '';
+            document.getElementById('shareScreenBtn').textContent = 'Share Screen';
+            document.getElementById('shareScreenBtn').onclick = startScreenShare;
+            document.getElementById('shareScreenBtn').disabled = true;
+            
+            hideStatus();
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            // Auto-hide success messages after 3 seconds
+            if (type === 'success') {
+                setTimeout(hideStatus, 3000);
+            }
+        }
+
+        // Hide status message
+        function hideStatus() {
+            document.getElementById('statusMessage').style.display = 'none';
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            // Disable share screen button initially
+            document.getElementById('shareScreenBtn').disabled = true;
+            
+            // Handle Enter key in session code input
+            document.getElementById('sessionCode').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    joinSession();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
