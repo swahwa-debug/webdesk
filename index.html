@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Screen Share</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -327,15 +328,19 @@
             margin-bottom: 5px;
         }
 
-        .force-share-btn {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            margin-top: 10px;
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
         }
 
-        .force-share-btn:hover {
-            background: #f1b0b7;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -352,11 +357,10 @@
         <!-- Initial Screen -->
         <div id="initialScreen">
             <div class="server-options">
-                <h4>Signaling Server:</h4>
-                <select id="serverSelect" onchange="changeServer()">
-                    <option value="wss://webrtc-signaling.glitch.me">Server 1 (Glitch)</option>
-                    <option value="wss://webrtc-signaling-server.glitch.me">Server 2 (Glitch)</option>
-                    <option value="wss://simple-webrtc-signaling.herokuapp.com">Server 3 (Heroku)</option>
+                <h4>Connection Method:</h4>
+                <select id="connectionMethod" onchange="changeConnectionMethod()">
+                    <option value="peerjs">PeerJS (Recommended)</option>
+                    <option value="websocket">WebSocket Server</option>
                 </select>
             </div>
             
@@ -398,15 +402,11 @@
             
             <div class="host-status" id="hostStatus">
                 <h4>Connection Status:</h4>
-                <p id="hostStatusText">Waiting for someone to join your session...</p>
+                <p id="hostStatusText"><span class="loading"></span>Initializing connection...</p>
             </div>
             
             <button class="button button-primary" id="shareScreenBtn" onclick="startScreenShare()" disabled>
                 Share Screen
-            </button>
-            
-            <button class="button force-share-btn" id="forceShareBtn" onclick="forceStartScreenShare()" style="display: none;">
-                Force Start Sharing (Advanced)
             </button>
             
             <button class="button button-secondary" onclick="resetApp()">
@@ -426,7 +426,7 @@
                     <li>Check that the host granted screen sharing permissions</li>
                     <li>Try refreshing both pages and reconnecting</li>
                     <li>Ensure both users have stable internet connections</li>
-                    <li>Try selecting a different signaling server above</li>
+                    <li>Try switching connection method above</li>
                 </ul>
             </div>
             
@@ -445,39 +445,52 @@
     </div>
 
     <script>
-        // Global variables for WebRTC and WebSocket
-        let peerConnection = null;
+        // Global variables
+        let peer = null;
+        let conn = null;
         let localStream = null;
-        let socket = null;
         let sessionId = null;
         let isHost = false;
+        let connectionMethod = 'peerjs';
+        let peerConnected = false;
+
+        // WebSocket variables (fallback)
+        let socket = null;
+        let peerConnection = null;
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         let reconnectTimeout = null;
-        let peerConnected = false;
 
-        // Default signaling server
-        let WS_SERVER = 'wss://webrtc-signaling.glitch.me';
-
-        // WebRTC configuration
-        const rtcConfiguration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]
+        // PeerJS configuration
+        const peerjsConfig = {
+            debug: 2,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
         };
+
+        // WebSocket server options
+        const wsServers = [
+            'wss://webrtc-signaling.glitch.me',
+            'wss://webrtc-signaling-server.glitch.me',
+            'wss://simple-webrtc-signaling.herokuapp.com'
+        ];
+        let currentWsServer = wsServers[0];
 
         // Generate a random 6-digit session code
         function generateSessionCode() {
             return Math.floor(100000 + Math.random() * 900000).toString();
         }
 
-        // Change signaling server
-        function changeServer() {
-            const select = document.getElementById('serverSelect');
-            WS_SERVER = select.value;
-            console.log('Changed signaling server to:', WS_SERVER);
+        // Change connection method
+        function changeConnectionMethod() {
+            const select = document.getElementById('connectionMethod');
+            connectionMethod = select.value;
+            console.log('Changed connection method to:', connectionMethod);
         }
 
         // Update connection status indicator
@@ -498,15 +511,15 @@
         }
 
         // Update host status
-        function updateHostStatus(text) {
-            document.getElementById('hostStatusText').textContent = text;
+        function updateHostStatus(text, loading = false) {
+            const statusText = document.getElementById('hostStatusText');
+            statusText.innerHTML = loading ? `<span class="loading"></span>${text}` : text;
         }
 
         // Generate a new session
         function generateSession() {
             sessionId = generateSessionCode();
             isHost = true;
-            reconnectAttempts = 0;
             peerConnected = false;
             
             // Show host screen
@@ -514,19 +527,15 @@
             document.getElementById('hostScreen').classList.remove('hidden');
             document.getElementById('displayCode').textContent = sessionId;
             
-            // Connect to WebSocket server
-            connectWebSocket();
+            // Initialize connection based on method
+            if (connectionMethod === 'peerjs') {
+                initializePeerJS();
+            } else {
+                initializeWebSocket();
+            }
             
             showStatus('Session created. Waiting for connection...', 'info');
-            updateHostStatus('Waiting for someone to join your session...');
-            
-            // Enable force share button after 10 seconds if no peer connects
-            setTimeout(() => {
-                if (isHost && !peerConnected) {
-                    document.getElementById('forceShareBtn').style.display = 'block';
-                    updateHostStatus('No one has joined yet. You can try "Force Start Sharing" if you know someone is trying to connect.');
-                }
-            }, 10000);
+            updateHostStatus('Initializing connection...', true);
         }
 
         // Join an existing session
@@ -540,37 +549,192 @@
             
             sessionId = code;
             isHost = false;
-            reconnectAttempts = 0;
             
             // Show client screen
             document.getElementById('initialScreen').classList.add('hidden');
             document.getElementById('clientScreen').classList.remove('hidden');
             document.getElementById('connectedCode').textContent = sessionId;
             
-            // Connect to WebSocket server
-            connectWebSocket();
+            // Initialize connection based on method
+            if (connectionMethod === 'peerjs') {
+                initializePeerJS();
+            } else {
+                initializeWebSocket();
+            }
             
             showStatus('Connecting to session...', 'info');
         }
 
-        // Connect to WebSocket server for signaling
-        function connectWebSocket() {
-            // Clear any existing reconnect timeout
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-                reconnectTimeout = null;
-            }
-            
+        // Initialize PeerJS connection
+        function initializePeerJS() {
             try {
-                showStatus('Connecting to signaling server...', 'info');
-                console.log('Connecting to WebSocket server:', WS_SERVER);
+                // Create a new peer with the session ID
+                peer = new Peer(sessionId, peerjsConfig);
+                
+                peer.on('open', (id) => {
+                    console.log('PeerJS connected with ID:', id);
+                    updateConnectionStatus(true);
+                    
+                    if (isHost) {
+                        updateHostStatus('Waiting for someone to join your session...');
+                    } else {
+                        showStatus('Connected to session. Waiting for host...', 'info');
+                    }
+                });
+                
+                peer.on('connection', (connection) => {
+                    console.log('PeerJS connection established');
+                    conn = connection;
+                    setupPeerJSConnection();
+                });
+                
+                peer.on('error', (err) => {
+                    console.error('PeerJS error:', err);
+                    showStatus('Connection error: ' + err.type, 'error');
+                    
+                    // Fallback to WebSocket if PeerJS fails
+                    if (connectionMethod === 'peerjs') {
+                        showStatus('Falling back to WebSocket connection...', 'info');
+                        connectionMethod = 'websocket';
+                        initializeWebSocket();
+                    }
+                });
+                
+                // If client, connect to host
+                if (!isHost) {
+                    setTimeout(() => {
+                        if (peer && !conn) {
+                            console.log('Attempting to connect to host:', sessionId);
+                            conn = peer.connect(sessionId);
+                            setupPeerJSConnection();
+                        }
+                    }, 1000);
+                }
+                
+            } catch (error) {
+                console.error('Failed to initialize PeerJS:', error);
+                showStatus('Failed to initialize PeerJS. Trying fallback...', 'error');
+                
+                // Fallback to WebSocket
+                connectionMethod = 'websocket';
+                initializeWebSocket();
+            }
+        }
+
+        // Setup PeerJS connection handlers
+        function setupPeerJSConnection() {
+            conn.on('open', () => {
+                console.log('PeerJS data connection opened');
+                peerConnected = true;
+                updateConnectionStatus(true);
+                
+                if (isHost) {
+                    document.getElementById('shareScreenBtn').disabled = false;
+                    updateHostStatus('Peer connected! You can now share your screen.');
+                    showStatus('Peer connected successfully!', 'success');
+                } else {
+                    showStatus('Connected to host. Waiting for screen share...', 'info');
+                }
+            });
+            
+            conn.on('data', (data) => {
+                console.log('Received data:', data);
+                
+                if (data.type === 'offer') {
+                    if (!isHost) {
+                        handlePeerJSOffer(data.offer);
+                    }
+                } else if (data.type === 'answer') {
+                    if (isHost) {
+                        handlePeerJSAnswer(data.answer);
+                    }
+                } else if (data.type === 'ice-candidate') {
+                    handlePeerJSCandidate(data.candidate);
+                }
+            });
+            
+            conn.on('close', () => {
+                console.log('PeerJS connection closed');
+                peerConnected = false;
+                updateConnectionStatus(false);
+                
+                if (isHost) {
+                    document.getElementById('shareScreenBtn').disabled = true;
+                    updateHostStatus('Peer disconnected. Waiting for someone to join...');
+                } else {
+                    showStatus('Host disconnected', 'error');
+                }
+            });
+        }
+
+        // Handle PeerJS offer
+        async function handlePeerJSOffer(offer) {
+            try {
+                if (!peerConnection) {
+                    peerConnection = new RTCPeerConnection(peerjsConfig.config);
+                    
+                    peerConnection.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            conn.send({ type: 'ice-candidate', candidate: event.candidate });
+                        }
+                    };
+                    
+                    peerConnection.ontrack = (event) => {
+                        console.log('Received remote track');
+                        const remoteVideo = document.getElementById('remoteVideo');
+                        remoteVideo.srcObject = event.streams[0];
+                        document.getElementById('videoContainer').style.display = 'block';
+                        showStatus('Screen sharing started!', 'success');
+                    };
+                }
+                
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                conn.send({ type: 'answer', answer: answer });
+                
+            } catch (error) {
+                console.error('Error handling offer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle PeerJS answer
+        async function handlePeerJSAnswer(answer) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(answer);
+                }
+            } catch (error) {
+                console.error('Error handling answer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle PeerJS ICE candidate
+        async function handlePeerJSCandidate(candidate) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(candidate);
+                }
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
+        }
+
+        // Initialize WebSocket connection (fallback)
+        function initializeWebSocket() {
+            try {
+                showStatus('Connecting to WebSocket server...', 'info');
+                console.log('Connecting to WebSocket server:', currentWsServer);
                 
                 // Close existing socket if any
                 if (socket) {
                     socket.close();
                 }
                 
-                socket = new WebSocket(WS_SERVER);
+                socket = new WebSocket(currentWsServer);
                 
                 socket.onopen = () => {
                     console.log('Connected to WebSocket server');
@@ -583,13 +747,17 @@
                         sessionId: sessionId,
                         isHost: isHost
                     }));
+                    
+                    if (isHost) {
+                        updateHostStatus('Waiting for someone to join your session...');
+                    }
                 };
                 
                 socket.onmessage = async (event) => {
                     try {
                         const message = JSON.parse(event.data);
                         console.log('Received message:', message);
-                        await handleSignalingMessage(message);
+                        await handleWebSocketMessage(message);
                     } catch (e) {
                         console.error('Error parsing WebSocket message:', e);
                     }
@@ -603,47 +771,44 @@
                         reconnectAttempts++;
                         showStatus(`Connection lost. Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`, 'info');
                         
-                        // Exponential backoff for reconnection
-                        const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-                        console.log(`Reconnecting in ${timeout}ms...`);
+                        // Try next server
+                        currentWsServer = wsServers[reconnectAttempts % wsServers.length];
                         
                         reconnectTimeout = setTimeout(() => {
-                            connectWebSocket();
-                        }, timeout);
+                            initializeWebSocket();
+                        }, 2000);
                     } else {
-                        showStatus('Connection lost. Please try a different server or check your connection.', 'error');
+                        showStatus('Connection failed. Please try PeerJS method.', 'error');
                     }
                 };
                 
                 socket.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    showStatus('Failed to connect to server. Please try a different server.', 'error');
+                    showStatus('Failed to connect to server. Trying next server...', 'error');
                 };
             } catch (error) {
-                console.error('Failed to connect to WebSocket:', error);
-                showStatus('Failed to establish connection. Please try a different server.', 'error');
+                console.error('Failed to initialize WebSocket:', error);
+                showStatus('Failed to establish connection. Please try again.', 'error');
             }
         }
 
-        // Handle signaling messages from WebSocket
-        async function handleSignalingMessage(message) {
-            console.log('Received signaling message:', message);
-            
+        // Handle WebSocket messages
+        async function handleWebSocketMessage(message) {
             switch (message.type) {
                 case 'offer':
                     if (!isHost) {
-                        await handleOffer(message.offer);
+                        await handleWebSocketOffer(message.offer);
                     }
                     break;
                     
                 case 'answer':
                     if (isHost) {
-                        await handleAnswer(message.answer);
+                        await handleWebSocketAnswer(message.answer);
                     }
                     break;
                     
                 case 'ice-candidate':
-                    await handleIceCandidate(message.candidate);
+                    await handleWebSocketCandidate(message.candidate);
                     break;
                     
                 case 'peer-connected':
@@ -652,7 +817,6 @@
                     if (isHost) {
                         document.getElementById('shareScreenBtn').disabled = false;
                         updateHostStatus('Peer connected! You can now share your screen.');
-                        document.getElementById('forceShareBtn').style.display = 'none';
                     }
                     break;
                     
@@ -672,39 +836,68 @@
             }
         }
 
-        // Create and configure peer connection
-        function createPeerConnection() {
-            peerConnection = new RTCPeerConnection(rtcConfiguration);
-            
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    socket.send(JSON.stringify({
-                        type: 'ice-candidate',
-                        sessionId: sessionId,
-                        candidate: event.candidate
-                    }));
-                }
-            };
-            
-            // Handle connection state changes
-            peerConnection.onconnectionstatechange = () => {
-                console.log('Connection state:', peerConnection.connectionState);
+        // Handle WebSocket offer
+        async function handleWebSocketOffer(offer) {
+            if (!peerConnection) {
+                peerConnection = new RTCPeerConnection(peerjsConfig.config);
                 
-                if (peerConnection.connectionState === 'failed') {
-                    showStatus('Connection failed. Please try again.', 'error');
-                    cleanupConnection();
-                }
-            };
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.send(JSON.stringify({
+                            type: 'ice-candidate',
+                            sessionId: sessionId,
+                            candidate: event.candidate
+                        }));
+                    }
+                };
+                
+                peerConnection.ontrack = (event) => {
+                    console.log('Received remote track');
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    remoteVideo.srcObject = event.streams[0];
+                    document.getElementById('videoContainer').style.display = 'block';
+                    showStatus('Screen sharing started!', 'success');
+                };
+            }
             
-            // Handle remote stream
-            peerConnection.ontrack = (event) => {
-                console.log('Received remote track');
-                const remoteVideo = document.getElementById('remoteVideo');
-                remoteVideo.srcObject = event.streams[0];
-                document.getElementById('videoContainer').style.display = 'block';
-                showStatus('Screen sharing started!', 'success');
-            };
+            try {
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.send(JSON.stringify({
+                    type: 'answer',
+                    sessionId: sessionId,
+                    answer: answer
+                }));
+                
+            } catch (error) {
+                console.error('Error handling offer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle WebSocket answer
+        async function handleWebSocketAnswer(answer) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(answer);
+                }
+            } catch (error) {
+                console.error('Error handling answer:', error);
+                showStatus('Failed to establish connection.', 'error');
+            }
+        }
+
+        // Handle WebSocket ICE candidate
+        async function handleWebSocketCandidate(candidate) {
+            try {
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(candidate);
+                }
+            } catch (error) {
+                console.error('Error adding ICE candidate:', error);
+            }
         }
 
         // Start screen sharing (host only)
@@ -722,7 +915,21 @@
                 
                 // Create peer connection if not exists
                 if (!peerConnection) {
-                    createPeerConnection();
+                    peerConnection = new RTCPeerConnection(peerjsConfig.config);
+                    
+                    peerConnection.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            if (connectionMethod === 'peerjs' && conn) {
+                                conn.send({ type: 'ice-candidate', candidate: event.candidate });
+                            } else if (socket) {
+                                socket.send(JSON.stringify({
+                                    type: 'ice-candidate',
+                                    sessionId: sessionId,
+                                    candidate: event.candidate
+                                }));
+                            }
+                        }
+                    };
                 }
                 
                 // Add tracks to peer connection
@@ -739,11 +946,15 @@
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 
-                socket.send(JSON.stringify({
-                    type: 'offer',
-                    sessionId: sessionId,
-                    offer: offer
-                }));
+                if (connectionMethod === 'peerjs' && conn) {
+                    conn.send({ type: 'offer', offer: offer });
+                } else if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'offer',
+                        sessionId: sessionId,
+                        offer: offer
+                    }));
+                }
                 
                 document.getElementById('shareScreenBtn').textContent = 'Stop Sharing';
                 document.getElementById('shareScreenBtn').onclick = stopScreenShare;
@@ -760,22 +971,6 @@
                     showStatus('Failed to start screen sharing. Please try again.', 'error');
                 }
             }
-        }
-
-        // Force start screen sharing (for when peer-connected message doesn't arrive)
-        async function forceStartScreenShare() {
-            if (!isHost) return;
-            
-            // Create peer connection if not exists
-            if (!peerConnection) {
-                createPeerConnection();
-            }
-            
-            // Try to start screen sharing
-            await startScreenShare();
-            
-            // Show a message that we're trying to force the connection
-            updateHostStatus('Attempting to force start screen sharing. This may not work if the client is not properly connected.');
         }
 
         // Stop screen sharing
@@ -797,50 +992,6 @@
             document.getElementById('shareScreenBtn').onclick = startScreenShare;
             
             showStatus('Screen sharing stopped', 'info');
-        }
-
-        // Handle incoming offer (client)
-        async function handleOffer(offer) {
-            if (!peerConnection) {
-                createPeerConnection();
-            }
-            
-            try {
-                await peerConnection.setRemoteDescription(offer);
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                socket.send(JSON.stringify({
-                    type: 'answer',
-                    sessionId: sessionId,
-                    answer: answer
-                }));
-                
-            } catch (error) {
-                console.error('Error handling offer:', error);
-                showStatus('Failed to establish connection.', 'error');
-            }
-        }
-
-        // Handle incoming answer (host)
-        async function handleAnswer(answer) {
-            try {
-                await peerConnection.setRemoteDescription(answer);
-            } catch (error) {
-                console.error('Error handling answer:', error);
-                showStatus('Failed to establish connection.', 'error');
-            }
-        }
-
-        // Handle ICE candidate
-        async function handleIceCandidate(candidate) {
-            try {
-                if (peerConnection) {
-                    await peerConnection.addIceCandidate(candidate);
-                }
-            } catch (error) {
-                console.error('Error adding ICE candidate:', error);
-            }
         }
 
         // Clean up connection
@@ -871,6 +1022,12 @@
             // Clean up connections
             cleanupConnection();
             
+            // Close PeerJS connection
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            
             // Close WebSocket
             if (socket) {
                 socket.close();
@@ -880,8 +1037,9 @@
             // Reset variables
             sessionId = null;
             isHost = false;
-            reconnectAttempts = 0;
             peerConnected = false;
+            conn = null;
+            reconnectAttempts = 0;
             
             // Reset UI
             document.getElementById('initialScreen').classList.remove('hidden');
@@ -891,7 +1049,6 @@
             document.getElementById('shareScreenBtn').textContent = 'Share Screen';
             document.getElementById('shareScreenBtn').onclick = startScreenShare;
             document.getElementById('shareScreenBtn').disabled = true;
-            document.getElementById('forceShareBtn').style.display = 'none';
             
             updateConnectionStatus(false);
             hideStatus();
