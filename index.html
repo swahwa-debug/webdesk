@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Screen Share</title>
+    <title>Screen Share</title>
     <style>
         * {
             margin: 0;
@@ -19,6 +19,7 @@
             align-items: center;
             justify-content: center;
             color: #333;
+            padding: 20px;
         }
 
         .container {
@@ -27,7 +28,7 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
             max-width: 500px;
-            width: 90%;
+            width: 100%;
             text-align: center;
         }
 
@@ -190,9 +191,84 @@
             position: relative;
             color: #999;
         }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .connection-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            text-align: left;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .instructions ol {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
+    <div class="connection-status disconnected" id="connectionStatus">
+        <span class="status-dot disconnected" id="statusDot"></span>
+        <span id="statusText">Disconnected</span>
+    </div>
+
     <div class="container">
         <h1>Screen Share</h1>
         <p class="subtitle">Share your screen with anyone, anywhere</p>
@@ -215,6 +291,16 @@
             <button class="button button-secondary" onclick="joinSession()">
                 Join Session
             </button>
+
+            <div class="instructions">
+                <h3>How to use:</h3>
+                <ol>
+                    <li>Click "Generate Session Code" to create a new session</li>
+                    <li>Share the 6-digit code with the person you want to connect with</li>
+                    <li>They enter the code and click "Join Session"</li>
+                    <li>Click "Share Screen" to start sharing</li>
+                </ol>
+            </div>
         </div>
 
         <!-- Host Screen -->
@@ -225,7 +311,7 @@
                 <p style="color: #666; font-size: 0.9rem;">Share this code with the person you want to connect with</p>
             </div>
             
-            <button class="button button-primary" id="shareScreenBtn" onclick="startScreenShare()">
+            <button class="button button-primary" id="shareScreenBtn" onclick="startScreenShare()" disabled>
                 Share Screen
             </button>
             
@@ -260,6 +346,8 @@
         let socket = null;
         let sessionId = null;
         let isHost = false;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
 
         // WebSocket server configuration - UPDATE THIS with your server address
         const WS_SERVER = 'ws://localhost:8080'; // Change this to your WebSocket server
@@ -277,10 +365,28 @@
             return Math.floor(100000 + Math.random() * 900000).toString();
         }
 
+        // Update connection status indicator
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusEl.className = 'connection-status connected';
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Connected';
+            } else {
+                statusEl.className = 'connection-status disconnected';
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Disconnected';
+            }
+        }
+
         // Generate a new session
         function generateSession() {
             sessionId = generateSessionCode();
             isHost = true;
+            reconnectAttempts = 0;
             
             // Show host screen
             document.getElementById('initialScreen').classList.add('hidden');
@@ -304,6 +410,7 @@
             
             sessionId = code;
             isHost = false;
+            reconnectAttempts = 0;
             
             // Show client screen
             document.getElementById('initialScreen').classList.add('hidden');
@@ -323,6 +430,8 @@
                 
                 socket.onopen = () => {
                     console.log('Connected to WebSocket server');
+                    updateConnectionStatus(true);
+                    reconnectAttempts = 0;
                     
                     // Register session with server
                     socket.send(JSON.stringify({
@@ -337,9 +446,17 @@
                     await handleSignalingMessage(message);
                 };
                 
-                socket.onclose = () => {
-                    console.log('Disconnected from WebSocket server');
-                    showStatus('Connection lost. Please try again.', 'error');
+                socket.onclose = (event) => {
+                    console.log('Disconnected from WebSocket server', event.code, event.reason);
+                    updateConnectionStatus(false);
+                    
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        showStatus(`Connection lost. Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`, 'info');
+                        setTimeout(connectWebSocket, 2000 * reconnectAttempts);
+                    } else {
+                        showStatus('Connection lost. Please try again.', 'error');
+                    }
                 };
                 
                 socket.onerror = (error) => {
@@ -383,6 +500,10 @@
                 case 'peer-disconnected':
                     showStatus('Peer disconnected', 'info');
                     cleanupConnection();
+                    break;
+                    
+                case 'registration-failed':
+                    showStatus('Session not available or already full', 'error');
                     break;
             }
         }
@@ -565,6 +686,7 @@
             // Reset variables
             sessionId = null;
             isHost = false;
+            reconnectAttempts = 0;
             
             // Reset UI
             document.getElementById('initialScreen').classList.remove('hidden');
@@ -575,6 +697,7 @@
             document.getElementById('shareScreenBtn').onclick = startScreenShare;
             document.getElementById('shareScreenBtn').disabled = true;
             
+            updateConnectionStatus(false);
             hideStatus();
         }
 
