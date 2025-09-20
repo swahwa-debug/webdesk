@@ -349,8 +349,8 @@
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
 
-        // WebSocket server configuration - UPDATE THIS with your server address
-        const WS_SERVER = 'ws://localhost:8080'; // Change this to your WebSocket server
+        // Using a public signaling server (for demo purposes)
+        const WS_SERVER = 'wss://webrtc-signaling.glitch.me';
 
         // WebRTC configuration
         const rtcConfiguration = {
