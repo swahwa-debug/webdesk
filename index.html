@@ -261,6 +261,30 @@
         .instructions li {
             margin-bottom: 5px;
         }
+
+        .troubleshooting {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .troubleshooting h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .troubleshooting ul {
+            margin-left: 20px;
+        }
+
+        .troubleshooting li {
+            margin-bottom: 5px;
+            color: #856404;
+        }
     </style>
 </head>
 <body>
@@ -325,6 +349,16 @@
             <p style="margin-bottom: 20px;">Connected to session: <strong id="connectedCode"></strong></p>
             <p style="color: #666; margin-bottom: 20px;">Waiting for host to share screen...</p>
             
+            <div class="troubleshooting">
+                <h4>Troubleshooting:</h4>
+                <ul>
+                    <li>Make sure the host has clicked "Share Screen"</li>
+                    <li>Check that the host granted screen sharing permissions</li>
+                    <li>Try refreshing both pages and reconnecting</li>
+                    <li>Ensure both users have stable internet connections</li>
+                </ul>
+            </div>
+            
             <button class="button button-secondary" onclick="resetApp()">
                 Leave Session
             </button>
@@ -349,14 +383,15 @@
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
 
-        // Using a public signaling server (for demo purposes)
-        const WS_SERVER = 'wss://webrtc-signaling.glitch.me';
+        // Using alternative public signaling server
+        const WS_SERVER = 'wss://webrtc-signaling-server.glitch.me';
 
         // WebRTC configuration
         const rtcConfiguration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
             ]
         };
 
@@ -426,6 +461,7 @@
         // Connect to WebSocket server for signaling
         function connectWebSocket() {
             try {
+                showStatus('Connecting to signaling server...', 'info');
                 socket = new WebSocket(WS_SERVER);
                 
                 socket.onopen = () => {
@@ -443,6 +479,7 @@
                 
                 socket.onmessage = async (event) => {
                     const message = JSON.parse(event.data);
+                    console.log('Received message:', message);
                     await handleSignalingMessage(message);
                 };
                 
@@ -494,6 +531,7 @@
                     showStatus('Peer connected successfully!', 'success');
                     if (isHost) {
                         document.getElementById('shareScreenBtn').disabled = false;
+                        showStatus('You can now share your screen!', 'info');
                     }
                     break;
                     
@@ -548,6 +586,8 @@
             if (!isHost) return;
             
             try {
+                showStatus('Requesting screen access...', 'info');
+                
                 // Get screen stream
                 localStream = await navigator.mediaDevices.getDisplayMedia({
                     video: true,
@@ -586,7 +626,13 @@
                 
             } catch (error) {
                 console.error('Error starting screen share:', error);
-                showStatus('Failed to start screen sharing. Please try again.', 'error');
+                if (error.name === 'NotAllowedError') {
+                    showStatus('Screen sharing permission denied. Please allow access and try again.', 'error');
+                } else if (error.name === 'NotReadableError') {
+                    showStatus('Screen is already being shared by another application.', 'error');
+                } else {
+                    showStatus('Failed to start screen sharing. Please try again.', 'error');
+                }
             }
         }
 
