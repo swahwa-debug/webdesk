@@ -307,6 +307,36 @@
             border: 1px solid #b8daff;
             margin-top: 5px;
         }
+
+        .host-status {
+            background: #e2f0fb;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+            border: 1px solid #b3d7f7;
+        }
+
+        .host-status h4 {
+            color: #0c5460;
+            margin-bottom: 10px;
+        }
+
+        .host-status p {
+            color: #0c5460;
+            margin-bottom: 5px;
+        }
+
+        .force-share-btn {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            margin-top: 10px;
+        }
+
+        .force-share-btn:hover {
+            background: #f1b0b7;
+        }
     </style>
 </head>
 <body>
@@ -366,8 +396,17 @@
                 <p style="color: #666; font-size: 0.9rem;">Share this code with the person you want to connect with</p>
             </div>
             
+            <div class="host-status" id="hostStatus">
+                <h4>Connection Status:</h4>
+                <p id="hostStatusText">Waiting for someone to join your session...</p>
+            </div>
+            
             <button class="button button-primary" id="shareScreenBtn" onclick="startScreenShare()" disabled>
                 Share Screen
+            </button>
+            
+            <button class="button force-share-btn" id="forceShareBtn" onclick="forceStartScreenShare()" style="display: none;">
+                Force Start Sharing (Advanced)
             </button>
             
             <button class="button button-secondary" onclick="resetApp()">
@@ -415,6 +454,7 @@
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         let reconnectTimeout = null;
+        let peerConnected = false;
 
         // Default signaling server
         let WS_SERVER = 'wss://webrtc-signaling.glitch.me';
@@ -457,11 +497,17 @@
             }
         }
 
+        // Update host status
+        function updateHostStatus(text) {
+            document.getElementById('hostStatusText').textContent = text;
+        }
+
         // Generate a new session
         function generateSession() {
             sessionId = generateSessionCode();
             isHost = true;
             reconnectAttempts = 0;
+            peerConnected = false;
             
             // Show host screen
             document.getElementById('initialScreen').classList.add('hidden');
@@ -472,6 +518,15 @@
             connectWebSocket();
             
             showStatus('Session created. Waiting for connection...', 'info');
+            updateHostStatus('Waiting for someone to join your session...');
+            
+            // Enable force share button after 10 seconds if no peer connects
+            setTimeout(() => {
+                if (isHost && !peerConnected) {
+                    document.getElementById('forceShareBtn').style.display = 'block';
+                    updateHostStatus('No one has joined yet. You can try "Force Start Sharing" if you know someone is trying to connect.');
+                }
+            }, 10000);
         }
 
         // Join an existing session
@@ -592,16 +647,23 @@
                     break;
                     
                 case 'peer-connected':
+                    peerConnected = true;
                     showStatus('Peer connected successfully!', 'success');
                     if (isHost) {
                         document.getElementById('shareScreenBtn').disabled = false;
-                        showStatus('You can now share your screen!', 'info');
+                        updateHostStatus('Peer connected! You can now share your screen.');
+                        document.getElementById('forceShareBtn').style.display = 'none';
                     }
                     break;
                     
                 case 'peer-disconnected':
+                    peerConnected = false;
                     showStatus('Peer disconnected', 'info');
                     cleanupConnection();
+                    if (isHost) {
+                        document.getElementById('shareScreenBtn').disabled = true;
+                        updateHostStatus('Peer disconnected. Waiting for someone to join...');
+                    }
                     break;
                     
                 case 'registration-failed':
@@ -698,6 +760,22 @@
                     showStatus('Failed to start screen sharing. Please try again.', 'error');
                 }
             }
+        }
+
+        // Force start screen sharing (for when peer-connected message doesn't arrive)
+        async function forceStartScreenShare() {
+            if (!isHost) return;
+            
+            // Create peer connection if not exists
+            if (!peerConnection) {
+                createPeerConnection();
+            }
+            
+            // Try to start screen sharing
+            await startScreenShare();
+            
+            // Show a message that we're trying to force the connection
+            updateHostStatus('Attempting to force start screen sharing. This may not work if the client is not properly connected.');
         }
 
         // Stop screen sharing
@@ -803,6 +881,7 @@
             sessionId = null;
             isHost = false;
             reconnectAttempts = 0;
+            peerConnected = false;
             
             // Reset UI
             document.getElementById('initialScreen').classList.remove('hidden');
@@ -812,6 +891,7 @@
             document.getElementById('shareScreenBtn').textContent = 'Share Screen';
             document.getElementById('shareScreenBtn').onclick = startScreenShare;
             document.getElementById('shareScreenBtn').disabled = true;
+            document.getElementById('forceShareBtn').style.display = 'none';
             
             updateConnectionStatus(false);
             hideStatus();
