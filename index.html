@@ -281,6 +281,13 @@
             background: #dc3545;
         }
 
+        .demo-note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -356,6 +363,7 @@
                 <button id="disconnectBtn" class="btn btn-danger" disabled>DISCONNECT</button>
             </div>
             <p>Enter the Room ID that someone shared with you</p>
+            <p class="demo-note">Demo: Try connecting with "DEMO.01" to see a demo screen</p>
         </div>
 
         <div id="status" class="status disconnected">
@@ -380,6 +388,9 @@
                 this.initElements();
                 this.setupEventListeners();
                 this.updateStatus('Failed to connect: Room not found or session expired', 'disconnected');
+                
+                // Create a demo room for testing
+                this.createDemoRoom();
             }
 
             initElements() {
@@ -457,6 +468,19 @@
                 }
                 
                 return result;
+            }
+
+            createDemoRoom() {
+                // Create a demo room that always exists
+                const demoRoomId = 'DEMO.01';
+                const streamInfo = {
+                    roomId: demoRoomId,
+                    timestamp: Date.now(),
+                    active: true,
+                    isDemo: true
+                };
+                
+                localStorage.setItem(`stream_${demoRoomId}`, JSON.stringify(streamInfo));
             }
 
             async startScreenShare() {
@@ -564,7 +588,7 @@
                     this.isViewing = true;
                     this.disconnectBtn.disabled = false;
                     
-                    this.updateStatus(`Connected to room ${roomId}! (Demo Mode)`, 'connected');
+                    this.updateStatus(`Connected to room ${roomId}!`, 'connected');
                     
                     // Show demo message
                     this.showDemoMessage(roomId);
@@ -599,6 +623,7 @@
                     <h3 style="margin-bottom: 20px;">Connected to Room: ${roomId}</h3>
                     <p style="margin-bottom: 15px;">This is a demo version of the screen sharing app.</p>
                     <p style="margin-bottom: 15px;">In a production version, you would see the shared screen here.</p>
+                    ${roomId === 'DEMO.01' ? '<p style="font-weight: bold;">This is a demo room for testing purposes.</p>' : ''}
                 `;
                 
                 this.video.style.display = 'none';
