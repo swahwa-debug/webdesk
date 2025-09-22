@@ -223,6 +223,11 @@
             color: #721c24;
         }
 
+        .connection-status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+
         .status-dot {
             width: 8px;
             height: 8px;
@@ -232,6 +237,10 @@
 
         .status-dot.connected {
             animation: pulse 2s infinite;
+        }
+
+        .status-dot.connecting {
+            animation: pulse 1s infinite;
         }
 
         @keyframes pulse {
@@ -275,6 +284,41 @@
         .copy-btn:hover {
             background: #218838;
         }
+
+        .server-status {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .server-status h4 {
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .server-status p {
+            color: #6c757d;
+            margin: 0;
+        }
+
+        .retry-btn {
+            background: #ffc107;
+            color: #212529;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .retry-btn:hover {
+            background: #e0a800;
+        }
     </style>
 </head>
 <body>
@@ -287,6 +331,12 @@
             <button class="mode-btn" onclick="setMode('view')">View Screen</button>
         </div>
 
+        <!-- Server Status -->
+        <div class="server-status">
+            <h4>Server Status: <span id="serverStatus">Checking...</span></h4>
+            <p id="serverInfo">Connecting to signaling server...</p>
+        </div>
+
         <!-- Share Screen Section -->
         <div id="shareSection" class="section active">
             <div class="instructions">
@@ -296,7 +346,7 @@
                 <p>3. Once they enter the code, your screen will be shared automatically</p>
             </div>
 
-            <button class="button button-primary" onclick="generateCode()">Generate Code</button>
+            <button class="button button-primary" onclick="generateCode()" id="generateBtn">Generate Code</button>
 
             <div id="codeDisplay" class="code-display" style="display: none;">
                 <p>Your sharing code is:</p>
@@ -326,7 +376,7 @@
                 <input type="text" id="viewCode" placeholder="Enter 6-digit code" maxlength="6">
             </div>
 
-            <button class="button button-primary" onclick="viewScreen()">View Screen</button>
+            <button class="button button-primary" onclick="viewScreen()" id="viewBtn">View Screen</button>
 
             <div id="viewStatus" class="connection-status disconnected">
                 <span class="status-dot"></span>
@@ -351,15 +401,24 @@
         let sessionId = null;
         let currentMode = 'share';
         let isConnected = false;
+        let reconnectAttempts = 0;
+        let currentServerIndex = 0;
 
-        // WebSocket signaling server
-        const WS_SERVER = 'wss://webrtc-signaling.glitch.me';
+        // Multiple signaling servers for fallback
+        const signalingServers = [
+            'wss://webrtc-signaling.glitch.me',
+            'wss://webrtc-signaling-server.glitch.me',
+            'wss://simple-webrtc-signaling.herokuapp.com'
+        ];
 
         // WebRTC configuration
         const rtcConfiguration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' },
+                { urls: 'stun:stun3.l.google.com:19302' },
+                { urls: 'stun:stun4.l.google.com:19302' }
             ]
         };
 
@@ -383,6 +442,12 @@
             resetApp();
         }
 
+        // Update server status
+        function updateServerStatus(status, info) {
+            document.getElementById('serverStatus').textContent = status;
+            document.getElementById('serverInfo').textContent = info;
+        }
+
         // Generate random 6-digit code
         function generateCode() {
             sessionId = Math.floor(100000 + Math.random() * 900000).toString();
@@ -402,6 +467,15 @@
             const code = document.getElementById('sharingCode').textContent;
             navigator.clipboard.writeText(code).then(() => {
                 showStatus('Code copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showStatus('Code copied to clipboard!', 'success');
             });
         }
 
@@ -418,13 +492,23 @@
             connectWebSocket();
         }
 
-        // Connect to WebSocket server
+        // Connect to WebSocket server with fallback
         function connectWebSocket() {
+            const server = signalingServers[currentServerIndex];
+            updateServerStatus('Connecting...', `Trying server ${currentServerIndex + 1} of ${signalingServers.length}`);
+            
             try {
-                socket = new WebSocket(WS_SERVER);
+                // Close existing socket if any
+                if (socket) {
+                    socket.close();
+                }
+                
+                socket = new WebSocket(server);
                 
                 socket.onopen = () => {
-                    console.log('Connected to WebSocket server');
+                    console.log('Connected to WebSocket server:', server);
+                    updateServerStatus('Connected', `Connected to ${new URL(server).hostname}`);
+                    reconnectAttempts = 0;
                     
                     // Register session
                     socket.send(JSON.stringify({
@@ -446,21 +530,40 @@
                 };
                 
                 socket.onclose = () => {
-                    console.log('Disconnected from WebSocket server');
-                    if (currentMode === 'share') {
-                        updateShareStatus('Disconnected', false);
+                    console.log('Disconnected from WebSocket server:', server);
+                    
+                    // Try next server if available
+                    if (currentServerIndex < signalingServers.length - 1) {
+                        currentServerIndex++;
+                        updateServerStatus('Retrying...', `Trying next server...`);
+                        setTimeout(connectWebSocket, 1000);
                     } else {
-                        updateViewStatus('Disconnected', false);
+                        updateServerStatus('Failed', 'All servers unavailable');
+                        if (currentMode === 'share') {
+                            updateShareStatus('Connection failed', false);
+                        } else {
+                            updateViewStatus('Connection failed', false);
+                        }
+                        showStatus('Unable to connect to signaling servers. Please try again later.', 'error');
                     }
                 };
                 
                 socket.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    showStatus('Connection error. Please try again.', 'error');
+                    // The onclose handler will handle the fallback
                 };
+                
             } catch (error) {
                 console.error('Failed to connect to WebSocket:', error);
-                showStatus('Failed to connect. Please check your internet connection.', 'error');
+                
+                // Try next server if available
+                if (currentServerIndex < signalingServers.length - 1) {
+                    currentServerIndex++;
+                    setTimeout(connectWebSocket, 1000);
+                } else {
+                    updateServerStatus('Failed', 'Connection error');
+                    showStatus('Failed to connect. Please check your internet connection.', 'error');
+                }
             }
         }
 
@@ -492,6 +595,10 @@
                 case 'ice-candidate':
                     await handleIceCandidate(message.candidate);
                     break;
+                    
+                case 'registration-failed':
+                    showStatus('Session not found or already in use', 'error');
+                    break;
             }
         }
 
@@ -501,7 +608,7 @@
             
             // Handle ICE candidates
             peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
+                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({
                         type: 'ice-candidate',
                         sessionId: sessionId,
@@ -525,6 +632,11 @@
                     showStatus('Connected successfully!', 'success');
                 } else if (peerConnection.connectionState === 'failed') {
                     showStatus('Connection failed. Please try again.', 'error');
+                    if (currentMode === 'share') {
+                        updateShareStatus('Connection failed', false);
+                    } else {
+                        updateViewStatus('Connection failed', false);
+                    }
                 }
             };
             
@@ -571,18 +683,25 @@
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 
-                socket.send(JSON.stringify({
-                    type: 'offer',
-                    sessionId: sessionId,
-                    offer: offer
-                }));
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'offer',
+                        sessionId: sessionId,
+                        offer: offer
+                    }));
+                } else {
+                    showStatus('Connection lost. Please try again.', 'error');
+                    stopSharing();
+                }
                 
             } catch (error) {
                 console.error('Error starting screen share:', error);
                 if (error.name === 'NotAllowedError') {
                     showStatus('Screen sharing permission denied. Please allow access.', 'error');
+                } else if (error.name === 'NotReadableError') {
+                    showStatus('Screen is already being shared by another application.', 'error');
                 } else {
-                    showStatus('Failed to start screen sharing.', 'error');
+                    showStatus('Failed to start screen sharing. Please try again.', 'error');
                 }
             }
         }
@@ -598,15 +717,19 @@
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
                 
-                socket.send(JSON.stringify({
-                    type: 'answer',
-                    sessionId: sessionId,
-                    answer: answer
-                }));
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'answer',
+                        sessionId: sessionId,
+                        answer: answer
+                    }));
+                } else {
+                    showStatus('Connection lost. Please try again.', 'error');
+                }
                 
             } catch (error) {
                 console.error('Error handling offer:', error);
-                showStatus('Failed to establish connection.', 'error');
+                showStatus('Failed to establish connection. Please try again.', 'error');
             }
         }
 
@@ -616,7 +739,7 @@
                 await peerConnection.setRemoteDescription(answer);
             } catch (error) {
                 console.error('Error handling answer:', error);
-                showStatus('Failed to establish connection.', 'error');
+                showStatus('Failed to establish connection. Please try again.', 'error');
             }
         }
 
@@ -702,6 +825,10 @@
                 localStream = null;
             }
             
+            // Reset server index
+            currentServerIndex = 0;
+            updateServerStatus('Ready', 'Select a mode to begin');
+            
             // Clear inputs
             document.getElementById('viewCode').value = '';
             
@@ -732,6 +859,9 @@
                     viewScreen();
                 }
             });
+            
+            // Initialize server status
+            updateServerStatus('Ready', 'Select a mode to begin');
         });
     </script>
 </body>
