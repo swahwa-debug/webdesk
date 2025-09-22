@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Screen Share</title>
+    <title>Screen Share App</title>
     <style>
         * {
             margin: 0;
@@ -12,856 +12,532 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
             padding: 20px;
         }
 
         .container {
-            background: white;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
             text-align: center;
+            margin-bottom: 30px;
         }
 
-        h1 {
-            font-size: 2.5rem;
+        .header h1 {
+            color: #333;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 2.5em;
         }
 
-        .subtitle {
+        .header p {
             color: #666;
-            margin-bottom: 30px;
-            font-size: 1.1rem;
+            font-size: 1.1em;
         }
 
-        .mode-selector {
+        .control-panel {
             display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
             justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
         }
 
-        .mode-btn {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #667eea;
-            background: white;
-            color: #667eea;
-            border-radius: 10px;
-            cursor: pointer;
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
             font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .mode-btn.active {
-            background: #667eea;
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
         }
 
-        .mode-btn:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
 
-        .section {
-            display: none;
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
         }
 
-        .section.active {
-            display: block;
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
         }
 
-        .code-display {
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .video-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .video-container {
             background: #f8f9fa;
-            border: 2px dashed #ddd;
             border-radius: 15px;
-            padding: 30px;
-            margin: 20px 0;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #e9ecef;
         }
 
-        .code {
-            font-size: 3rem;
-            font-weight: bold;
-            color: #667eea;
-            letter-spacing: 8px;
-            margin: 15px 0;
+        .video-container h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.3em;
         }
 
-        .form-group {
+        video {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            background: #000;
+            border-radius: 10px;
+            object-fit: contain;
+        }
+
+        .connection-info {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
             margin-bottom: 20px;
-            text-align: left;
         }
 
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #555;
+        .connection-info h3 {
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .room-id {
+            font-family: 'Courier New', monospace;
+            font-size: 1.5em;
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .join-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .join-section h3 {
+            margin-bottom: 15px;
+            color: #1976d2;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
         }
 
         input[type="text"] {
-            width: 100%;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
+            flex: 1;
+            min-width: 200px;
+            padding: 12px;
+            border: 2px solid #ddd;
             border-radius: 10px;
-            font-size: 18px;
-            text-align: center;
-            letter-spacing: 2px;
-            transition: all 0.3s ease;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
         }
 
         input[type="text"]:focus {
             outline: none;
             border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .button {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 15px;
-        }
-
-        .button-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .button-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .button-secondary {
-            background: #f5f5f5;
-            color: #333;
-        }
-
-        .button-secondary:hover {
-            background: #e8e8e8;
-        }
-
-        .button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
         }
 
         .status {
             padding: 15px;
             border-radius: 10px;
-            margin: 20px 0;
-            font-weight: 500;
+            margin-bottom: 15px;
+            font-weight: 600;
+            text-align: center;
         }
 
-        .status.success {
+        .status.connected {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
 
-        .status.error {
+        .status.disconnected {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
 
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .video-container {
-            margin-top: 30px;
-            display: none;
-        }
-
-        video {
-            width: 100%;
-            max-width: 800px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .connection-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            margin: 15px 0;
-        }
-
-        .connection-status.connected {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .connection-status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .connection-status.connecting {
+        .status.connecting {
             background: #fff3cd;
             color: #856404;
+            border: 1px solid #ffeaa7;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
+        @media (max-width: 768px) {
+            .video-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            input[type="text"] {
+                min-width: unset;
+            }
         }
 
-        .status-dot.connected {
+        .pulse {
             animation: pulse 2s infinite;
         }
 
-        .status-dot.connecting {
-            animation: pulse 1s infinite;
-        }
-
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .instructions {
-            background: #e8f4fd;
-            border: 1px solid #b8daff;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            text-align: left;
-            font-size: 14px;
-        }
-
-        .instructions h3 {
-            color: #004085;
-            margin-bottom: 10px;
-        }
-
-        .instructions p {
-            color: #004085;
-            margin-bottom: 8px;
-        }
-
-        .copy-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .copy-btn:hover {
-            background: #218838;
-        }
-
-        .server-status {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-        .server-status h4 {
-            color: #495057;
-            margin-bottom: 8px;
-        }
-
-        .server-status p {
-            color: #6c757d;
-            margin: 0;
-        }
-
-        .retry-btn {
-            background: #ffc107;
-            color: #212529;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            margin-left: 10px;
-            transition: all 0.3s ease;
-        }
-
-        .retry-btn:hover {
-            background: #e0a800;
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Simple Screen Share</h1>
-        <p class="subtitle">Share your screen with a simple code</p>
-
-        <div class="mode-selector">
-            <button class="mode-btn active" onclick="setMode('share')">Share Screen</button>
-            <button class="mode-btn" onclick="setMode('view')">View Screen</button>
+        <div class="header">
+            <h1>🖥️ Screen Share App</h1>
+            <p>Share your screen instantly with anyone, anywhere</p>
         </div>
 
-        <!-- Server Status -->
-        <div class="server-status">
-            <h4>Server Status: <span id="serverStatus">Checking...</span></h4>
-            <p id="serverInfo">Connecting to signaling server...</p>
+        <div class="control-panel">
+            <button id="startBtn" class="btn btn-primary">Start Sharing</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>Stop Sharing</button>
         </div>
 
-        <!-- Share Screen Section -->
-        <div id="shareSection" class="section active">
-            <div class="instructions">
-                <h3>How to share your screen:</h3>
-                <p>1. Click "Generate Code" to create your sharing code</p>
-                <p>2. Share this code with the person who wants to view your screen</p>
-                <p>3. Once they enter the code, your screen will be shared automatically</p>
-            </div>
-
-            <button class="button button-primary" onclick="generateCode()" id="generateBtn">Generate Code</button>
-
-            <div id="codeDisplay" class="code-display" style="display: none;">
-                <p>Your sharing code is:</p>
-                <div class="code" id="sharingCode"></div>
-                <button class="copy-btn" onclick="copyCode()">Copy Code</button>
-            </div>
-
-            <div id="shareStatus" class="connection-status disconnected">
-                <span class="status-dot"></span>
-                Waiting for someone to join...
-            </div>
-
-            <button class="button button-secondary" onclick="stopSharing()" id="stopBtn" style="display: none;">Stop Sharing</button>
+        <div id="connectionInfo" class="connection-info" style="display: none;">
+            <h3>🔗 Share This Room ID</h3>
+            <div class="room-id" id="roomId"></div>
+            <p>Share this ID with others so they can view your screen!</p>
         </div>
 
-        <!-- View Screen Section -->
-        <div id="viewSection" class="section">
-            <div class="instructions">
-                <h3>How to view a screen:</h3>
-                <p>1. Enter the sharing code you received</p>
-                <p>2. Click "View Screen" to connect</p>
-                <p>3. The shared screen will appear automatically</p>
-            </div>
-
-            <div class="form-group">
-                <label for="viewCode">Enter Sharing Code:</label>
-                <input type="text" id="viewCode" placeholder="Enter 6-digit code" maxlength="6">
-            </div>
-
-            <button class="button button-primary" onclick="viewScreen()" id="viewBtn">View Screen</button>
-
-            <div id="viewStatus" class="connection-status disconnected">
-                <span class="status-dot"></span>
-                Not Connected
+        <div class="join-section">
+            <h3>👥 Join Someone's Screen Share</h3>
+            <div class="input-group">
+                <input type="text" id="joinRoomId" placeholder="Enter Room ID to join...">
+                <button id="joinBtn" class="btn btn-primary">Join Room</button>
             </div>
         </div>
 
-        <!-- Status Messages -->
-        <div id="statusMessage" class="status" style="display: none;"></div>
+        <div id="status" class="status disconnected">
+            Ready to start screen sharing
+        </div>
 
-        <!-- Video Container -->
-        <div id="videoContainer" class="video-container">
-            <video id="remoteVideo" autoplay playsinline></video>
+        <div class="video-section">
+            <div class="video-container">
+                <h3>📺 Your Screen</h3>
+                <video id="localVideo" autoplay muted></video>
+            </div>
+            <div class="video-container">
+                <h3>👀 Remote Screen</h3>
+                <video id="remoteVideo" autoplay></video>
+            </div>
         </div>
     </div>
 
     <script>
-        // Global variables
-        let socket = null;
-        let peerConnection = null;
-        let localStream = null;
-        let sessionId = null;
-        let currentMode = 'share';
-        let isConnected = false;
-        let reconnectAttempts = 0;
-        let currentServerIndex = 0;
-
-        // Multiple signaling servers for fallback
-        const signalingServers = [
-            'wss://webrtc-signaling.glitch.me',
-            'wss://webrtc-signaling-server.glitch.me',
-            'wss://simple-webrtc-signaling.herokuapp.com'
-        ];
-
-        // WebRTC configuration
-        const rtcConfiguration = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
-            ]
-        };
-
-        // Set mode (share or view)
-        function setMode(mode) {
-            currentMode = mode;
-            
-            // Update button states
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            
-            // Show appropriate section
-            document.querySelectorAll('.section').forEach(section => {
-                section.classList.remove('active');
-            });
-            document.getElementById(mode + 'Section').classList.add('active');
-            
-            // Reset everything
-            resetApp();
-        }
-
-        // Update server status
-        function updateServerStatus(status, info) {
-            document.getElementById('serverStatus').textContent = status;
-            document.getElementById('serverInfo').textContent = info;
-        }
-
-        // Generate random 6-digit code
-        function generateCode() {
-            sessionId = Math.floor(100000 + Math.random() * 900000).toString();
-            
-            // Show code
-            document.getElementById('sharingCode').textContent = sessionId;
-            document.getElementById('codeDisplay').style.display = 'block';
-            
-            // Connect to WebSocket
-            connectWebSocket();
-            
-            showStatus('Code generated! Share this code to start sharing.', 'success');
-        }
-
-        // Copy code to clipboard
-        function copyCode() {
-            const code = document.getElementById('sharingCode').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                showStatus('Code copied to clipboard!', 'success');
-            }).catch(() => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = code;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showStatus('Code copied to clipboard!', 'success');
-            });
-        }
-
-        // View screen with code
-        function viewScreen() {
-            const code = document.getElementById('viewCode').value.trim();
-            
-            if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
-                showStatus('Please enter a valid 6-digit code', 'error');
-                return;
+        class ScreenShareApp {
+            constructor() {
+                this.localStream = null;
+                this.peerConnection = null;
+                this.socket = null;
+                this.roomId = null;
+                this.isHost = false;
+                
+                this.initElements();
+                this.initWebSocket();
+                this.setupEventListeners();
             }
-            
-            sessionId = code;
-            connectWebSocket();
-        }
 
-        // Connect to WebSocket server with fallback
-        function connectWebSocket() {
-            const server = signalingServers[currentServerIndex];
-            updateServerStatus('Connecting...', `Trying server ${currentServerIndex + 1} of ${signalingServers.length}`);
-            
-            try {
-                // Close existing socket if any
-                if (socket) {
-                    socket.close();
-                }
-                
-                socket = new WebSocket(server);
-                
-                socket.onopen = () => {
-                    console.log('Connected to WebSocket server:', server);
-                    updateServerStatus('Connected', `Connected to ${new URL(server).hostname}`);
-                    reconnectAttempts = 0;
-                    
-                    // Register session
-                    socket.send(JSON.stringify({
-                        type: 'register',
-                        sessionId: sessionId,
-                        isHost: currentMode === 'share'
-                    }));
-                    
-                    if (currentMode === 'share') {
-                        updateShareStatus('Waiting for someone to join...', false);
-                    } else {
-                        updateViewStatus('Connecting...', false);
-                    }
-                };
-                
-                socket.onmessage = async (event) => {
-                    const message = JSON.parse(event.data);
-                    await handleSignalingMessage(message);
-                };
-                
-                socket.onclose = () => {
-                    console.log('Disconnected from WebSocket server:', server);
-                    
-                    // Try next server if available
-                    if (currentServerIndex < signalingServers.length - 1) {
-                        currentServerIndex++;
-                        updateServerStatus('Retrying...', `Trying next server...`);
-                        setTimeout(connectWebSocket, 1000);
-                    } else {
-                        updateServerStatus('Failed', 'All servers unavailable');
-                        if (currentMode === 'share') {
-                            updateShareStatus('Connection failed', false);
-                        } else {
-                            updateViewStatus('Connection failed', false);
+            initElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.stopBtn = document.getElementById('stopBtn');
+                this.joinBtn = document.getElementById('joinBtn');
+                this.localVideo = document.getElementById('localVideo');
+                this.remoteVideo = document.getElementById('remoteVideo');
+                this.roomIdDisplay = document.getElementById('roomId');
+                this.joinRoomIdInput = document.getElementById('joinRoomId');
+                this.connectionInfo = document.getElementById('connectionInfo');
+                this.status = document.getElementById('status');
+            }
+
+            initWebSocket() {
+                // For demo purposes, we'll simulate signaling with localStorage
+                // In a real app, you'd use a WebSocket server
+                this.simulateSignaling();
+            }
+
+            simulateSignaling() {
+                // Simple signaling using localStorage for demo
+                // This allows testing on a single machine
+                setInterval(() => {
+                    const messages = JSON.parse(localStorage.getItem('signaling') || '[]');
+                    messages.forEach((msg, index) => {
+                        if (msg.to === this.roomId && !msg.processed) {
+                            this.handleSignalingMessage(msg);
+                            msg.processed = true;
                         }
-                        showStatus('Unable to connect to signaling servers. Please try again later.', 'error');
-                    }
-                };
-                
-                socket.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    // The onclose handler will handle the fallback
-                };
-                
-            } catch (error) {
-                console.error('Failed to connect to WebSocket:', error);
-                
-                // Try next server if available
-                if (currentServerIndex < signalingServers.length - 1) {
-                    currentServerIndex++;
-                    setTimeout(connectWebSocket, 1000);
-                } else {
-                    updateServerStatus('Failed', 'Connection error');
-                    showStatus('Failed to connect. Please check your internet connection.', 'error');
-                }
+                    });
+                    localStorage.setItem('signaling', JSON.stringify(messages));
+                }, 1000);
             }
-        }
 
-        // Handle signaling messages
-        async function handleSignalingMessage(message) {
-            console.log('Received message:', message);
-            
-            switch (message.type) {
-                case 'peer-connected':
-                    if (currentMode === 'share') {
-                        updateShareStatus('Peer connected! Starting screen share...', true);
-                        // Automatically start sharing when peer connects
-                        setTimeout(startScreenShare, 1000);
-                    }
-                    break;
-                    
-                case 'offer':
-                    if (currentMode === 'view') {
-                        await handleOffer(message.offer);
-                    }
-                    break;
-                    
-                case 'answer':
-                    if (currentMode === 'share') {
-                        await handleAnswer(message.answer);
-                    }
-                    break;
-                    
-                case 'ice-candidate':
-                    await handleIceCandidate(message.candidate);
-                    break;
-                    
-                case 'registration-failed':
-                    showStatus('Session not found or already in use', 'error');
-                    break;
-            }
-        }
-
-        // Create peer connection
-        function createPeerConnection() {
-            peerConnection = new RTCPeerConnection(rtcConfiguration);
-            
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate && socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        type: 'ice-candidate',
-                        sessionId: sessionId,
-                        candidate: event.candidate
-                    }));
-                }
-            };
-            
-            // Handle connection state
-            peerConnection.onconnectionstatechange = () => {
-                console.log('Connection state:', peerConnection.connectionState);
-                
-                if (peerConnection.connectionState === 'connected') {
-                    isConnected = true;
-                    if (currentMode === 'share') {
-                        updateShareStatus('Sharing screen', true);
-                        document.getElementById('stopBtn').style.display = 'inline-block';
-                    } else {
-                        updateViewStatus('Viewing screen', true);
-                    }
-                    showStatus('Connected successfully!', 'success');
-                } else if (peerConnection.connectionState === 'failed') {
-                    showStatus('Connection failed. Please try again.', 'error');
-                    if (currentMode === 'share') {
-                        updateShareStatus('Connection failed', false);
-                    } else {
-                        updateViewStatus('Connection failed', false);
-                    }
-                }
-            };
-            
-            // Handle remote stream (for viewer)
-            if (currentMode === 'view') {
-                peerConnection.ontrack = (event) => {
-                    console.log('Received remote track');
-                    const remoteVideo = document.getElementById('remoteVideo');
-                    remoteVideo.srcObject = event.streams[0];
-                    document.getElementById('videoContainer').style.display = 'block';
-                };
-            }
-            
-            return peerConnection;
-        }
-
-        // Start screen sharing
-        async function startScreenShare() {
-            if (currentMode !== 'share') return;
-            
-            try {
-                showStatus('Requesting screen access...', 'info');
-                
-                // Get screen stream
-                localStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: true,
-                    audio: false
+            sendSignalingMessage(message) {
+                const messages = JSON.parse(localStorage.getItem('signaling') || '[]');
+                messages.push({
+                    ...message,
+                    timestamp: Date.now(),
+                    processed: false
                 });
-                
-                // Create peer connection
-                peerConnection = createPeerConnection();
-                
-                // Add tracks to peer connection
-                localStream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, localStream);
+                localStorage.setItem('signaling', JSON.stringify(messages));
+            }
+
+            setupEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startScreenShare());
+                this.stopBtn.addEventListener('click', () => this.stopScreenShare());
+                this.joinBtn.addEventListener('click', () => this.joinRoom());
+            }
+
+            async startScreenShare() {
+                try {
+                    this.updateStatus('Starting screen share...', 'connecting');
+                    this.startBtn.classList.add('pulse');
+                    
+                    // Get screen capture
+                    this.localStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,
+                        audio: true
+                    });
+
+                    this.localVideo.srcObject = this.localStream;
+                    
+                    // Generate room ID
+                    this.roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    this.isHost = true;
+                    
+                    this.roomIdDisplay.textContent = this.roomId;
+                    this.connectionInfo.style.display = 'block';
+                    
+                    this.startBtn.disabled = true;
+                    this.stopBtn.disabled = false;
+                    this.startBtn.classList.remove('pulse');
+                    
+                    this.updateStatus('Screen sharing started! Waiting for viewers...', 'connected');
+                    
+                    // Setup peer connection for when someone joins
+                    this.setupPeerConnection();
+                    
+                } catch (error) {
+                    console.error('Error starting screen share:', error);
+                    this.updateStatus('Failed to start screen sharing. Please try again.', 'disconnected');
+                    this.startBtn.classList.remove('pulse');
+                }
+            }
+
+            async joinRoom() {
+                const roomId = this.joinRoomIdInput.value.trim().toUpperCase();
+                if (!roomId) {
+                    alert('Please enter a room ID');
+                    return;
+                }
+
+                try {
+                    this.updateStatus('Joining room...', 'connecting');
+                    this.joinBtn.classList.add('pulse');
+                    
+                    this.roomId = roomId;
+                    this.isHost = false;
+                    
+                    this.setupPeerConnection();
+                    
+                    // Send join request
+                    this.sendSignalingMessage({
+                        type: 'join',
+                        from: 'viewer',
+                        to: roomId
+                    });
+                    
+                    this.joinBtn.disabled = true;
+                    this.joinBtn.classList.remove('pulse');
+                    
+                } catch (error) {
+                    console.error('Error joining room:', error);
+                    this.updateStatus('Failed to join room. Please check the room ID.', 'disconnected');
+                    this.joinBtn.classList.remove('pulse');
+                }
+            }
+
+            setupPeerConnection() {
+                this.peerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
                 });
-                
-                // Handle stream end
-                localStream.getVideoTracks()[0].onended = () => {
-                    stopSharing();
+
+                // Add local stream if host
+                if (this.isHost && this.localStream) {
+                    this.localStream.getTracks().forEach(track => {
+                        this.peerConnection.addTrack(track, this.localStream);
+                    });
+                }
+
+                // Handle remote stream
+                this.peerConnection.ontrack = (event) => {
+                    this.remoteVideo.srcObject = event.streams[0];
+                    if (!this.isHost) {
+                        this.updateStatus('Connected! Viewing screen...', 'connected');
+                    } else {
+                        this.updateStatus('Viewer connected! Sharing screen...', 'connected');
+                    }
                 };
-                
-                // Create and send offer
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        type: 'offer',
-                        sessionId: sessionId,
-                        offer: offer
-                    }));
-                } else {
-                    showStatus('Connection lost. Please try again.', 'error');
-                    stopSharing();
+
+                // Handle ICE candidates
+                this.peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        this.sendSignalingMessage({
+                            type: 'ice-candidate',
+                            candidate: event.candidate,
+                            from: this.isHost ? this.roomId : 'viewer',
+                            to: this.isHost ? 'viewer' : this.roomId
+                        });
+                    }
+                };
+
+                this.peerConnection.onconnectionstatechange = () => {
+                    console.log('Connection state:', this.peerConnection.connectionState);
+                };
+            }
+
+            async handleSignalingMessage(message) {
+                if (!this.peerConnection) return;
+
+                switch (message.type) {
+                    case 'join':
+                        if (this.isHost) {
+                            // Create offer for viewer
+                            const offer = await this.peerConnection.createOffer();
+                            await this.peerConnection.setLocalDescription(offer);
+                            
+                            this.sendSignalingMessage({
+                                type: 'offer',
+                                offer: offer,
+                                from: this.roomId,
+                                to: 'viewer'
+                            });
+                        }
+                        break;
+
+                    case 'offer':
+                        if (!this.isHost) {
+                            await this.peerConnection.setRemoteDescription(message.offer);
+                            
+                            const answer = await this.peerConnection.createAnswer();
+                            await this.peerConnection.setLocalDescription(answer);
+                            
+                            this.sendSignalingMessage({
+                                type: 'answer',
+                                answer: answer,
+                                from: 'viewer',
+                                to: this.roomId
+                            });
+                        }
+                        break;
+
+                    case 'answer':
+                        if (this.isHost) {
+                            await this.peerConnection.setRemoteDescription(message.answer);
+                        }
+                        break;
+
+                    case 'ice-candidate':
+                        await this.peerConnection.addIceCandidate(message.candidate);
+                        break;
                 }
-                
-            } catch (error) {
-                console.error('Error starting screen share:', error);
-                if (error.name === 'NotAllowedError') {
-                    showStatus('Screen sharing permission denied. Please allow access.', 'error');
-                } else if (error.name === 'NotReadableError') {
-                    showStatus('Screen is already being shared by another application.', 'error');
-                } else {
-                    showStatus('Failed to start screen sharing. Please try again.', 'error');
+            }
+
+            stopScreenShare() {
+                if (this.localStream) {
+                    this.localStream.getTracks().forEach(track => track.stop());
+                    this.localStream = null;
                 }
-            }
-        }
 
-        // Handle incoming offer (viewer)
-        async function handleOffer(offer) {
-            if (!peerConnection) {
-                peerConnection = createPeerConnection();
-            }
-            
-            try {
-                await peerConnection.setRemoteDescription(offer);
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({
-                        type: 'answer',
-                        sessionId: sessionId,
-                        answer: answer
-                    }));
-                } else {
-                    showStatus('Connection lost. Please try again.', 'error');
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null;
                 }
+
+                this.localVideo.srcObject = null;
+                this.remoteVideo.srcObject = null;
                 
-            } catch (error) {
-                console.error('Error handling offer:', error);
-                showStatus('Failed to establish connection. Please try again.', 'error');
+                this.connectionInfo.style.display = 'none';
+                this.startBtn.disabled = false;
+                this.stopBtn.disabled = true;
+                this.joinBtn.disabled = false;
+                
+                this.updateStatus('Screen sharing stopped', 'disconnected');
+                
+                // Clear room
+                this.roomId = null;
+                this.isHost = false;
+            }
+
+            updateStatus(message, type) {
+                this.status.textContent = message;
+                this.status.className = `status ${type}`;
             }
         }
 
-        // Handle incoming answer (sharer)
-        async function handleAnswer(answer) {
-            try {
-                await peerConnection.setRemoteDescription(answer);
-            } catch (error) {
-                console.error('Error handling answer:', error);
-                showStatus('Failed to establish connection. Please try again.', 'error');
-            }
-        }
-
-        // Handle ICE candidate
-        async function handleIceCandidate(candidate) {
-            try {
-                if (peerConnection) {
-                    await peerConnection.addIceCandidate(candidate);
-                }
-            } catch (error) {
-                console.error('Error adding ICE candidate:', error);
-            }
-        }
-
-        // Stop sharing
-        function stopSharing() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            
-            document.getElementById('stopBtn').style.display = 'none';
-            updateShareStatus('Sharing stopped', false);
-            showStatus('Screen sharing stopped', 'info');
-        }
-
-        // Update share status
-        function updateShareStatus(text, connected) {
-            const statusEl = document.getElementById('shareStatus');
-            if (connected) {
-                statusEl.className = 'connection-status connected';
-                statusEl.innerHTML = '<span class="status-dot connected"></span>' + text;
-            } else {
-                statusEl.className = 'connection-status disconnected';
-                statusEl.innerHTML = '<span class="status-dot"></span>' + text;
-            }
-        }
-
-        // Update view status
-        function updateViewStatus(text, connected) {
-            const statusEl = document.getElementById('viewStatus');
-            if (connected) {
-                statusEl.className = 'connection-status connected';
-                statusEl.innerHTML = '<span class="status-dot connected"></span>' + text;
-            } else {
-                statusEl.className = 'connection-status disconnected';
-                statusEl.innerHTML = '<span class="status-dot"></span>' + text;
-            }
-        }
-
-        // Show status message
-        function showStatus(message, type) {
-            const statusEl = document.getElementById('statusMessage');
-            statusEl.textContent = message;
-            statusEl.className = `status ${type}`;
-            statusEl.style.display = 'block';
-            
-            // Auto-hide success messages after 3 seconds
-            if (type === 'success') {
-                setTimeout(() => {
-                    statusEl.style.display = 'none';
-                }, 3000);
-            }
-        }
-
-        // Reset application
-        function resetApp() {
-            // Close WebSocket
-            if (socket) {
-                socket.close();
-                socket = null;
-            }
-            
-            // Close peer connection
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            
-            // Stop local stream
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            
-            // Reset server index
-            currentServerIndex = 0;
-            updateServerStatus('Ready', 'Select a mode to begin');
-            
-            // Clear inputs
-            document.getElementById('viewCode').value = '';
-            
-            // Hide elements
-            document.getElementById('codeDisplay').style.display = 'none';
-            document.getElementById('stopBtn').style.display = 'none';
-            document.getElementById('videoContainer').style.display = 'none';
-            
-            // Reset status
-            if (currentMode === 'share') {
-                updateShareStatus('Waiting for someone to join...', false);
-            } else {
-                updateViewStatus('Not Connected', false);
-            }
-            
-            // Hide status message
-            document.getElementById('statusMessage').style.display = 'none';
-            
-            // Reset connection state
-            isConnected = false;
-        }
-
-        // Initialize
+        // Initialize the app when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
-            // Handle Enter key in view code input
-            document.getElementById('viewCode').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    viewScreen();
-                }
-            });
-            
-            // Initialize server status
-            updateServerStatus('Ready', 'Select a mode to begin');
+            new ScreenShareApp();
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            // Clean up resources
+            if (window.screenShareApp && window.screenShareApp.localStream) {
+                window.screenShareApp.stopScreenShare();
+            }
         });
     </script>
 </body>
